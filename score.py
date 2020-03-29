@@ -38,10 +38,8 @@ class ScoreEntry:
 class ScoreBoard:
     DATE_REGEX = re.compile(
         r'log-(?P<year>\d{4})(?P<month>\d{2})(?P<day>\d{2})-\d+')
-    START_REGEX = re.compile(
-        r'(?P<time>\d{2}:\d{2}:\d{2}):(?P<unit>WU\d+):(?P<slot>FS\d+):(\w+):Project: (?P<project_id>\d+) \(Run (?P<run>\d+), Clone (?P<clone>\d+), Gen (?P<gen>\d+)\)')
-    END_REGEX = re.compile(
-        r'(?P<time>\d{2}:\d{2}:\d{2}):(?P<unit>WU\d+):(?P<slot>FS\d+):Final credit estimate, (?P<points>[\d\.]+) points')
+    LINE_REGEX = re.compile(
+        r'(?P<time>\d{2}:\d{2}:\d{2})(:(?P<level>[A-Z]+))?:(?P<unit>WU\d+):(?P<slot>FS\d+)(:(?P<type>(0x|0X)[a-fA-F0-9]+))?:((Project: (?P<project_id>\d+) \(Run (?P<run>\d+), Clone (?P<clone>\d+), Gen (?P<gen>\d+)\))|(Final credit estimate, (?P<points>[\d\.]+) points)|(((?P<msg_type>(ERROR|Exception)): ?)?(?P<msg>[\w ,]+)))')
 
     def __init__(self):
         self.scores = []
@@ -55,21 +53,19 @@ class ScoreBoard:
         self.set_current_date_from_file(file)
 
         for line in log.splitlines():
-            match = self.START_REGEX.match(line)
-            if match:
-                try:
-                    self.handle_start(match)
-                except:
-                    pass
-                continue
+            try:
+                self.handle_line(line)
+            except:
+                pass
+            continue
 
-            match = self.END_REGEX.match(line)
-            if match:
-                try:
-                    self.handle_end(match)
-                except:
-                    pass
-                continue
+    def handle_line(self, line):
+            info = self.LINE_REGEX.match(line).groupdict()
+
+            if info['project_id']:
+                self._handle_start(info)
+            elif info['points']:
+                self._handle_end(info)
 
     def set_current_date_from_file(self, file_name):
         name = pathlib.Path(file_name).stem
@@ -86,12 +82,12 @@ class ScoreBoard:
             day=int(match.group('day')),
         )
 
-    def handle_start(self, match):
+    def _handle_start(self, info):
         entry = ScoreEntry(
-            start=f'{self.current_date}T{match.group("time")}',
-            project=match.group('project_id'),
-            slot=match.group('slot'),
-            unit=match.group('unit'),
+            start=f'{self.current_date}T{info["time"]}',
+            project=info['project_id'],
+            slot=info['slot'],
+            unit=info['unit'],
         )
 
         same = [e for e in self.started if e.slot ==
@@ -100,11 +96,11 @@ class ScoreBoard:
         if not same:
             self.started.append(entry)
 
-    def handle_end(self, match):
-        end = f'{self.current_date}T{match.group("time")}'
-        slot = match.group('slot')
-        points = ast.literal_eval(match.group('points'))
-        unit = match.group('unit')
+    def _handle_end(self, info):
+        end = f'{self.current_date}T{info["time"]}'
+        slot = info['slot']
+        points = ast.literal_eval(info['points'])
+        unit = info['unit']
 
         found = None
         for entry in self.started:

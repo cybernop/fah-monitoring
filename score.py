@@ -12,6 +12,8 @@ FS_MAPPING = {
     'FS01': 'GPU'
 }
 
+STR_FAILED_ASSIGNMENT = 'Failed to get assignment'
+
 
 class ScoreEntry:
     __slots__ = ['start', 'end', 'duration',
@@ -45,6 +47,8 @@ class ScoreBoard:
         self.scores = []
         self.started = []
         self.errors = []
+        self.waiting = {}
+        self.waited = []
         self.current_date = None
 
     def read_log(self, log_file):
@@ -61,14 +65,16 @@ class ScoreBoard:
             continue
 
     def handle_line(self, line):
-            info = self.LINE_REGEX.match(line).groupdict()
+        info = self.LINE_REGEX.match(line).groupdict()
 
-            if info['project_id']:
-                self._handle_start(info)
-            elif info['points']:
-                self._handle_end(info)
-            elif info['job_msg']:
-                self._handle_job_msg(info)
+        if info['project_id']:
+            self._handle_start(info)
+        elif info['points']:
+            self._handle_end(info)
+        elif info['job_msg']:
+            self._handle_job_msg(info)
+        elif info['msg']:
+            self._handle_msg(info)
 
     def set_current_date_from_file(self, file_name):
         name = pathlib.Path(file_name).stem
@@ -90,13 +96,21 @@ class ScoreBoard:
 
     def _handle_job_msg(self, info):
         if 'Program' in info['job_msg_msg']:
-            self.errors.append(self.__generate_timestamp(info["time"]))
+            self.errors.append(self.__generate_timestamp(info['time']))
 
     def _handle_start(self, info):
+        timestamp = self.__generate_timestamp(info['time'])
+        slot = info['slot']
+
+        if slot in self.waiting:
+            duration = datetime.fromisoformat(timestamp) - self.waiting[slot]
+            self.waited.append((slot, str(duration)))
+            del self.waiting[slot]
+
         entry = ScoreEntry(
-            start=self.__generate_timestamp(info["time"]),
+            start=timestamp,
             project=info['project_id'],
-            slot=info['slot'],
+            slot=slot,
             unit=info['unit'],
         )
 
@@ -107,7 +121,7 @@ class ScoreBoard:
             self.started.append(entry)
 
     def _handle_end(self, info):
-        end = self.__generate_timestamp(info["time"])
+        end = self.__generate_timestamp(info['time'])
         slot = info['slot']
         points = ast.literal_eval(info['points'])
         unit = info['unit']
@@ -127,6 +141,10 @@ class ScoreBoard:
         found.calculate_duration()
 
         self.scores.append(found)
+
+    def _handle_msg(self, info):
+        if STR_FAILED_ASSIGNMENT in info['msg'] and info['slot'] not in self.waiting:
+            self.waiting[info['slot']] = datetime.fromisoformat(self.__generate_timestamp(info['time']))
 
     def __str__(self):
         return '\n'.join([str(entry) for entry in self.scores])

@@ -44,6 +44,7 @@ class ScoreBoard:
     def __init__(self):
         self.scores = []
         self.started = []
+        self.errors = []
         self.current_date = None
 
     def read_log(self, log_file):
@@ -66,6 +67,8 @@ class ScoreBoard:
                 self._handle_start(info)
             elif info['points']:
                 self._handle_end(info)
+            elif info['job_msg']:
+                self._handle_job_msg(info)
 
     def set_current_date_from_file(self, file_name):
         name = pathlib.Path(file_name).stem
@@ -82,9 +85,16 @@ class ScoreBoard:
             day=int(match.group('day')),
         )
 
+    def __generate_timestamp(self, time):
+        return f'{self.current_date}T{time}'
+
+    def _handle_job_msg(self, info):
+        if 'Program' in info['job_msg_msg']:
+            self.errors.append(self.__generate_timestamp(info["time"]))
+
     def _handle_start(self, info):
         entry = ScoreEntry(
-            start=f'{self.current_date}T{info["time"]}',
+            start=self.__generate_timestamp(info["time"]),
             project=info['project_id'],
             slot=info['slot'],
             unit=info['unit'],
@@ -97,7 +107,7 @@ class ScoreBoard:
             self.started.append(entry)
 
     def _handle_end(self, info):
-        end = f'{self.current_date}T{info["time"]}'
+        end = self.__generate_timestamp(info["time"])
         slot = info['slot']
         points = ast.literal_eval(info['points'])
         unit = info['unit']

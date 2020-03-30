@@ -13,6 +13,7 @@ FS_MAPPING = {
 }
 
 STR_FAILED_ASSIGNMENT = 'Failed to get assignment'
+STR_DUMPED = 'Server did not like results, dumping'
 
 
 class ScoreEntry:
@@ -49,6 +50,7 @@ class ScoreBoard:
         self.errors = []
         self.waiting = {}
         self.waited = []
+        self.dumped = []
         self.current_date = None
 
     def read_log(self, log_file):
@@ -143,8 +145,18 @@ class ScoreBoard:
         self.scores.append(found)
 
     def _handle_msg(self, info):
-        if STR_FAILED_ASSIGNMENT in info['msg'] and info['slot'] not in self.waiting:
-            self.waiting[info['slot']] = datetime.fromisoformat(self.__generate_timestamp(info['time']))
+        msg = info['msg']
+        slot = info['slot']
+        timestamp = self.__generate_timestamp(info['time'])
+
+        if STR_FAILED_ASSIGNMENT in msg and info['slot'] not in self.waiting:
+            self.waiting[info['slot']] = datetime.fromisoformat(timestamp)
+        elif STR_DUMPED in msg:
+            for entry in self.started:
+                if info['slot'] == entry.slot and info['unit'] == entry.unit:
+                    self.dumped.append((slot, timestamp))
+                    self.started.remove(entry)
+                    break
 
     def __str__(self):
         return '\n'.join([str(entry) for entry in self.scores])

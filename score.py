@@ -1,7 +1,7 @@
 import logging
 import pathlib
 import re
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 import ast
 import itertools
 
@@ -49,8 +49,8 @@ class ScoreBoard:
         self.started = []
         self.errors = []
         self.waiting = {}
-        self.waited = []
-        self.dumped = []
+        self.waited = {}
+        self.dumped = {}
         self.current_date = None
 
     def read_log(self, log_file):
@@ -106,7 +106,11 @@ class ScoreBoard:
 
         if slot in self.waiting:
             duration = datetime.fromisoformat(timestamp) - self.waiting[slot]
-            self.waited.append((slot, str(duration)))
+            if self.current_date not in self.waited:
+                self.waited[self.current_date] = {}
+            fs = FS_MAPPING[slot]
+            waited = self.waited[self.current_date].get(fs, timedelta()) + duration
+            self.waited[self.current_date][fs] = waited
             del self.waiting[slot]
 
         entry = ScoreEntry(
@@ -153,8 +157,12 @@ class ScoreBoard:
             self.waiting[info['slot']] = datetime.fromisoformat(timestamp)
         elif STR_DUMPED in msg:
             for entry in self.started:
-                if info['slot'] == entry.slot and info['unit'] == entry.unit:
-                    self.dumped.append((slot, timestamp))
+                if slot == entry.slot and info['unit'] == entry.unit:
+                    if self.current_date not in self.dumped:
+                        self.dumped[self.current_date] = {}
+                    key = FS_MAPPING[slot]
+                    n_dumped = self.dumped[self.current_date].get(FS_MAPPING[slot], 0) + 1
+                    self.dumped[self.current_date][FS_MAPPING[slot]] = n_dumped
                     self.started.remove(entry)
                     break
 

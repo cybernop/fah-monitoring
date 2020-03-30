@@ -39,7 +39,7 @@ class ScoreBoard:
     DATE_REGEX = re.compile(
         r'log-(?P<year>\d{4})(?P<month>\d{2})(?P<day>\d{2})-\d+')
     LINE_REGEX = re.compile(
-        r'(?P<time>\d{2}:\d{2}:\d{2})(:(?P<level>[A-Z]+))?:(?P<unit>WU\d+):(?P<slot>FS\d+)(:(?P<type>(0x|0X)[a-fA-F0-9]+))?:((Project: (?P<project_id>\d+) \(Run (?P<run>\d+), Clone (?P<clone>\d+), Gen (?P<gen>\d+)\))|(Final credit estimate, (?P<points>[\d\.]+) points)|(((?P<msg_type>(ERROR|Exception)): ?)?(?P<msg>[\w ,]+)))')
+        r'(?P<time>\d{2}:\d{2}:\d{2})(:(?P<level>[A-Z]+))?:(?P<unit>WU\d+):(?P<slot>FS\d+):((?P<type>(0x|0X)[a-fA-F0-9]+)?:(?P<job_msg>(Project: (?P<project_id>\d+) \(Run (?P<run>\d+), Clone (?P<clone>\d+), Gen (?P<gen>\d+)\))|((?P<job_msg_level>ERROR)(: ?(?P<job_msg_msg>.+))?))|(Final credit estimate, (?P<points>[\d\.]+) points)|(((?P<msg_type>Exception): ?)?(?P<msg>[\w ,]+)?))')
 
     def __init__(self):
         self.scores = []
